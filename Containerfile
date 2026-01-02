@@ -49,21 +49,16 @@ COPY --from=ghcr.io/projectbluefin/branding:latest /system_files /oci/branding
 COPY --from=ghcr.io/ublue-os/artwork:latest /system_files /oci/artwork
 COPY --from=ghcr.io/ublue-os/brew:latest /system_files /oci/brew
 
-# Base Image - silverblue-main or CentOS Stream
+# Base Image - GNOME included
 FROM ghcr.io/ublue-os/silverblue-main:latest
 
-## Alternative base images (uncomment to use):
-# For CentOS Stream based image:
+## Alternative base images, no desktop included (uncomment to use):
+# FROM ghcr.io/ublue-os/base-main:latest    
 # FROM quay.io/centos-bootc/centos-bootc:stream10
-#
-# For other Universal Blue images:
-# FROM ghcr.io/ublue-os/bazzite:latest
-# FROM ghcr.io/ublue-os/bluefin:stable
-# FROM ghcr.io/ublue-os/bluefin-nvidia:stable
-#
-# Universal Blue Images: https://github.com/orgs/ublue-os/packages
-# Fedora base images: quay.io/fedora/fedora-bootc:42
-# CentOS base images: quay.io/centos-bootc/centos-bootc:stream10
+
+## Alternative GNOME OS base image (uncomment to use):
+# FROM quay.io/gnome_infrastructure/gnome-build-meta:gnomeos-nightly
+
 
 ### /opt
 ## Some bootable images, like Fedora, have /opt symlinked to /var/opt, in order to
