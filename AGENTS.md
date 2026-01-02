@@ -83,7 +83,7 @@ Signing is DISABLED by default. First builds succeed immediately. Enable later f
 ## Repository Structure
 
 ```
-├── Containerfile          # Main build definition (FROM image, /opt config)
+├── Containerfile          # Main build definition (multi-stage build with OCI imports)
 ├── Justfile              # Local build automation (image name, build commands)
 ├── build/                # Build-time scripts (10-build.sh, 20-chrome.sh, etc.)
 │   ├── 10-build.sh      # Main build script (copy custom files, install packages)
@@ -126,6 +126,29 @@ Signing is DISABLED by default. First builds succeed immediately. Enable later f
 ---
 
 ## Core Principles
+
+### Multi-Stage Build Architecture
+This template follows the **Bluefin architecture pattern** from @projectbluefin/distroless:
+
+**Architecture Layers:**
+1. **Context Stage (ctx)** - Combines resources from multiple sources:
+   - Local build scripts (`/build`)
+   - Local custom files (`/custom`)
+   - **@projectbluefin/common** - Desktop configuration shared with Aurora (`/oci/common`)
+   - **@projectbluefin/branding** - Branding assets (`/oci/branding`)
+   - **@ublue-os/artwork** - Artwork shared with Aurora and Bazzite (`/oci/artwork`)
+   - **@ublue-os/brew** - Homebrew integration (`/oci/brew`)
+
+2. **Base Image Options:**
+   - `ghcr.io/ublue-os/silverblue-main:42` (Fedora-based, default)
+   - `quay.io/centos-bootc/centos-bootc:stream10` (CentOS-based)
+
+**OCI Container Resources:**
+- Resources from OCI containers are copied to **distinct subdirectories** (`/oci/*`) to avoid file conflicts
+- Renovate automatically updates `:latest` tags to **SHA digests** for reproducibility
+- All OCI resources are mounted at build-time via the `ctx` stage
+
+**Reference:** See [Bluefin Contributing Guide](https://docs.projectbluefin.io/contributing/) for architecture diagram
 
 ### Build-time vs Runtime
 - **Build-time** (`build/`): Baked into container. Use `dnf5 install`. Services, configs, system packages.
@@ -282,22 +305,58 @@ Branch=stable
 
 ## Detailed Workflows
 
-### 1. Base Images
+### 1. Multi-Stage Build Architecture
 
-**File**: `Containerfile` line 24
+**File**: `Containerfile`
 
-**Common choices**:
+This template uses a **multi-stage build** following the @projectbluefin/distroless pattern.
+
+**Stage 1: Context (ctx) - Line 39**
+Combines resources from multiple OCI containers:
+```dockerfile
+FROM scratch AS ctx
+
+COPY build /build
+COPY custom /custom
+# Import from OCI containers - Renovate updates :latest to SHA digests
+COPY --from=ghcr.io/projectbluefin/common:latest /system_files /oci/common
+COPY --from=ghcr.io/projectbluefin/branding:latest /system_files /oci/branding
+COPY --from=ghcr.io/ublue-os/artwork:latest /system_files /oci/artwork
+COPY --from=ghcr.io/ublue-os/brew:latest /system_files /oci/brew
+```
+
+**Stage 2: Base Image - Line 51**
+```dockerfile
+FROM ghcr.io/ublue-os/silverblue-main:42  # Default (Fedora-based)
+# OR
+FROM quay.io/centos-bootc/centos-bootc:stream10  # CentOS-based
+```
+
+**Common alternative base images**:
 ```dockerfile
 FROM ghcr.io/ublue-os/bluefin:stable      # Dev, GNOME, `:stable` or `:gts`
 FROM ghcr.io/ublue-os/bazzite:stable      # Gaming, Steam Deck
 FROM ghcr.io/ublue-os/aurora:stable       # KDE Plasma
 FROM quay.io/fedora/fedora-bootc:42       # Upstream Fedora
-FROM quay.io/centos-bootc/centos-bootc:stream10  # Enterprise
 ```
 
 **Tags**: `:stable` (recommended), `:latest` (bleeding edge), `-nvidia` variants available
 
-**Renovate**: Base image SHA is auto-updated by Renovate bot every 6 hours (see `.github/renovate.json5`)
+**Renovate**: Base image SHA and OCI container tags are auto-updated by Renovate bot every 6 hours (see `.github/renovate.json5`)
+
+**OCI Container Resources:**
+- **@projectbluefin/common** - Desktop configuration shared with Aurora
+- **@projectbluefin/branding** - Branding assets
+- **@ublue-os/artwork** - Artwork shared with Aurora and Bazzite
+- **@ublue-os/brew** - Homebrew integration
+
+**File Locations in Build Scripts:**
+- Local build scripts: `/ctx/build/`
+- Local custom files: `/ctx/custom/`
+- Common files: `/ctx/oci/common/`
+- Branding files: `/ctx/oci/branding/`
+- Artwork files: `/ctx/oci/artwork/`
+- Brew files: `/ctx/oci/brew/`
 
 ### 2. Build Scripts (`build/`)
 
@@ -454,11 +513,73 @@ bootc switch --mutate-in-place --transport registry ghcr.io/USERNAME/REPO:stable
 - Runs every 6 hours (configured in `.github/renovate.json5`)
 - Creates PRs for updates - review and merge to keep images current
 
-### 8. Image Signing (Optional, Recommended for Production)
+### 8. Understanding the Multi-Stage Build Architecture
+
+This template implements a **multi-stage build pattern** following @projectbluefin/distroless.
+
+**Why Multi-Stage?**
+- **Modularity**: Combine resources from multiple OCI containers
+- **Reusability**: Share common components across different images
+- **Maintainability**: Update shared components independently
+- **Reproducibility**: Renovate updates OCI container tags to SHA digests
+
+**Stage Breakdown:**
+
+**Stage 1: Context (ctx)**
+```dockerfile
+FROM scratch AS ctx
+COPY build /build                    # Local build scripts
+COPY custom /custom                  # Local customizations
+COPY --from=ghcr.io/projectbluefin/common:latest /system_files /oci/common
+COPY --from=ghcr.io/projectbluefin/branding:latest /system_files /oci/branding
+COPY --from=ghcr.io/ublue-os/artwork:latest /system_files /oci/artwork
+COPY --from=ghcr.io/ublue-os/brew:latest /system_files /oci/brew
+```
+
+This stage combines:
+- **Local resources** (build scripts, custom files)
+- **OCI container resources** from upstream projects
+- Resources are copied to **distinct subdirectories** to avoid conflicts
+
+**Stage 2: Final Image**
+```dockerfile
+FROM ghcr.io/ublue-os/silverblue-main:42
+
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    /ctx/build/10-build.sh
+```
+
+The final stage:
+- Starts from base image
+- Mounts the `ctx` stage at `/ctx`
+- Runs build scripts with access to all resources
+
+**Accessing OCI Resources in Build Scripts:**
+
+Build scripts can access files from OCI containers:
+```bash
+#!/usr/bin/env bash
+# Example: Copy branding files
+cp -r /ctx/oci/branding/* /usr/share/branding/
+
+# Example: Copy common desktop config
+cp /ctx/oci/common/config.yaml /etc/myapp/
+
+# Example: Use brew files
+cp /ctx/oci/brew/*.sh /usr/local/bin/
+```
+
+**Renovate Integration:**
+- Renovate monitors OCI container tags (`:latest`)
+- Automatically updates to SHA digests for reproducibility
+- Example: `:latest` → `@sha256:abc123...`
+- Ensures builds are reproducible and verifiable
+
+**Reference:** See [Bluefin Contributing Guide](https://docs.projectbluefin.io/contributing/) for architecture diagram
+
+### 9. Image Signing (Optional, Recommended for Production)
 
 **Default**: DISABLED (commented out in workflows) to allow first builds.
-
-**Enable**:
 ```bash
 # Generate keys
 COSIGN_PASSWORD="" cosign generate-key-pair

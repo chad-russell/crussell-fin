@@ -2,6 +2,8 @@
 
 A template for building custom bootc operating system images based on the lessons from [Universal Blue](https://universal-blue.org/) and [Bluefin](https://projectbluefin.io). It is designed to be used manually, but is optimized to be bootstraped by GitHub Copilot. After set up you'll have your own custom Linux. 
 
+This template uses the **multi-stage build architecture** from @projectbluefin/distroless, combining resources from multiple OCI containers for modularity and maintainability. See the [Architecture](#architecture) section below for details.
+
 > Be the one who moves, not the one who is moved.
 
 ## Guided Copilot Mode
@@ -223,6 +225,50 @@ cosign verify --key cosign.pub ghcr.io/your-username/your-repo-name:stable
 - [Flatpak Preinstall](custom/flatpaks/README.md) - GUI application setup
 - [ujust Commands](custom/ujust/README.md) - User convenience commands
 - [Build Scripts](build/README.md) - Build-time customization
+
+## Architecture
+
+This template follows the **multi-stage build architecture** from @projectbluefin/distroless, as documented in the [Bluefin Contributing Guide](https://docs.projectbluefin.io/contributing/).
+
+### Multi-Stage Build Pattern
+
+**Stage 1: Context (ctx)** - Combines resources from multiple sources:
+- Local build scripts (`/build`)
+- Local custom files (`/custom`)
+- **@projectbluefin/common** - Desktop configuration shared with Aurora
+- **@projectbluefin/branding** - Branding assets
+- **@ublue-os/artwork** - Artwork shared with Aurora and Bazzite
+- **@ublue-os/brew** - Homebrew integration
+
+**Stage 2: Base Image** - Default options:
+- `ghcr.io/ublue-os/silverblue-main:42` (Fedora-based, default)
+- `quay.io/centos-bootc/centos-bootc:stream10` (CentOS-based alternative)
+
+### Benefits of This Architecture
+
+- **Modularity**: Compose your image from reusable OCI containers
+- **Maintainability**: Update shared components independently
+- **Reproducibility**: Renovate automatically updates OCI tags to SHA digests
+- **Consistency**: Share components across Bluefin, Aurora, and custom images
+
+### OCI Container Resources
+
+The template imports files from these OCI containers at build time:
+
+```dockerfile
+COPY --from=ghcr.io/projectbluefin/common:latest /system_files /oci/common
+COPY --from=ghcr.io/projectbluefin/branding:latest /system_files /oci/branding
+COPY --from=ghcr.io/ublue-os/artwork:latest /system_files /oci/artwork
+COPY --from=ghcr.io/ublue-os/brew:latest /system_files /oci/brew
+```
+
+Your build scripts can access these files at:
+- `/ctx/oci/common/` - Shared desktop configuration
+- `/ctx/oci/branding/` - Branding assets
+- `/ctx/oci/artwork/` - Artwork files
+- `/ctx/oci/brew/` - Homebrew integration files
+
+**Note**: Renovate automatically updates `:latest` tags to SHA digests for reproducible builds.
 
 ## Local Testing
 
