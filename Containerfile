@@ -3,6 +3,20 @@ FROM scratch AS ctx
 COPY build /build
 COPY custom /custom
 
+## OCI Containers for Artwork, Branding, and Additional System Files
+## Following the @projectbluefin/distroless pattern, you can layer in additional
+## system files from OCI containers. These are commented out by default for the template.
+## Uncomment and customize as needed for your image.
+
+## Artwork and Branding from projectbluefin/common
+## This includes wallpapers, themes, and bluefin-specific branding
+# COPY --from=ghcr.io/projectbluefin/common:latest /system_files/bluefin /files/bluefin
+# COPY --from=ghcr.io/projectbluefin/common:latest /system_files/shared /files/shared
+
+## Homebrew system files from ublue-os/brew
+## This provides additional brew-related system integration
+# COPY --from=ghcr.io/ublue-os/brew:latest /system_files /files/brew
+
 ###############################################################################
 # PROJECT NAME CONFIGURATION
 ###############################################################################

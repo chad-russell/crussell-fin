@@ -1,5 +1,13 @@
 # Copilot Instructions for finpilot bootc Image Template
 
+## CRITICAL: GitHub API Usage
+
+**ALWAYS use GitHub API for external references:**
+- When researching other repositories (e.g., projectbluefin/distroless, ublue-os/bluefin)
+- When checking Containerfiles, build scripts, or configuration files
+- Use the `github-mcp-server-get_file_contents` tool instead of curl/wget
+- This ensures consistent, authenticated access and better error handling
+
 ## CRITICAL: Pre-Commit Checklist
 
 **Execute before EVERY commit:**
@@ -271,7 +279,8 @@ Branch=stable
 | Add user command | Create shortcut (NO dnf5) | `custom/ujust/*.just` |
 | Add third-party repo | Use example scripts | `build/20-*.sh.example` (rename) |
 | Replace desktop | Use example script | `build/30-cosmic-desktop.sh.example` |
-| Switch base image | Update FROM line | `Containerfile` line 24 |
+| Switch base image | Update FROM line | `Containerfile` line 38 |
+| Add OCI containers | Uncomment COPY --from= lines | `Containerfile` lines 13-18 (ctx stage) |
 | Test locally | `just build && just build-qcow2 && just run-vm-qcow2` | Terminal |
 | Deploy (production) | `sudo bootc switch ghcr.io/user/repo:stable` | Terminal |
 | Enable service | `systemctl enable service.name` | `build/10-build.sh` |
@@ -299,7 +308,38 @@ FROM quay.io/centos-bootc/centos-bootc:stream10  # Enterprise
 
 **Renovate**: Base image SHA is auto-updated by Renovate bot every 6 hours (see `.github/renovate.json5`)
 
-### 2. Build Scripts (`build/`)
+### 2. OCI Containers for Additional System Files
+
+**File**: `Containerfile` (ctx stage, lines 6-18)
+
+Following the `@projectbluefin/distroless` pattern, you can layer in additional system files from OCI containers. These are commented out by default in the template.
+
+**Available OCI Containers**:
+```dockerfile
+# Artwork and Branding from projectbluefin/common
+COPY --from=ghcr.io/projectbluefin/common:latest /system_files/bluefin /files/bluefin
+COPY --from=ghcr.io/projectbluefin/common:latest /system_files/shared /files/shared
+
+# Homebrew system files from ublue-os/brew
+COPY --from=ghcr.io/ublue-os/brew:latest /system_files /files/brew
+```
+
+**What's included**:
+- `projectbluefin/common:latest` - Bluefin wallpapers, themes, branding assets, ujust completions, udev rules
+- `ublue-os/brew:latest` - Homebrew system integration files
+
+**When to use**:
+- You want Bluefin-specific artwork and wallpapers in your custom image
+- You want additional system integration beyond what the base image provides
+- You're building a Bluefin derivative and want to maintain brand consistency
+
+**Important**: 
+- These are **commented out by default** as template examples
+- Uncomment only if you specifically want these additional system files
+- The files are copied into the `ctx` stage and made available to your build scripts
+- To use the files in your build, you'll need to copy them from `/ctx/files/*` to appropriate system locations in your build scripts
+
+### 3. Build Scripts (`build/`)
 
 **Pattern**: Numbered files (`10-build.sh`, `20-chrome.sh`, `30-cosmic.sh`) run in order.
 
@@ -351,7 +391,7 @@ systemctl set-default graphical.target
 
 **Example scripts**: See `build/20-onepassword.sh.example` and `build/30-cosmic-desktop.sh.example` for complete working examples.
 
-### 3. Homebrew (`custom/brew/`)
+### 4. Homebrew (`custom/brew/`)
 
 **Files**: `*.Brewfile` (Ruby syntax)
 
@@ -371,7 +411,7 @@ brew "python"
 
 **Users install via**: `ujust install-default-apps` (create shortcut in `custom/ujust/`)
 
-### 4. ujust Commands (`custom/ujust/`)
+### 5. ujust Commands (`custom/ujust/`)
 
 **Files**: `*.just` (all auto-consolidated)
 
@@ -393,7 +433,7 @@ install-dev-tools:
 - Use `[group('Category')]` for organization
 - All `.just` files merged during build
 
-### 5. Flatpaks (`custom/flatpaks/`)
+### 6. Flatpaks (`custom/flatpaks/`)
 
 **Files**: `*.preinstall` (INI format, installed after first boot)
 
@@ -411,7 +451,7 @@ Branch=stable
 
 **Important**: Not in ISO/container. Installed post-first-boot. Requires internet. Find IDs at https://flathub.org/
 
-### 6. ISO/Disk Images (`iso/`)
+### 7. ISO/Disk Images (`iso/`)
 
 **For local testing only. No CI/CD.**
 
@@ -431,7 +471,7 @@ bootc switch --mutate-in-place --transport registry ghcr.io/USERNAME/REPO:stable
 
 **Upload**: Use `iso/rclone/` configs (Cloudflare R2, AWS S3, Backblaze B2, SFTP)
 
-### 7. Release Workflow
+### 8. Release Workflow
 
 **Branches**:
 - `main` - Production only. Builds `:stable` images. Never push directly.
@@ -454,7 +494,7 @@ bootc switch --mutate-in-place --transport registry ghcr.io/USERNAME/REPO:stable
 - Runs every 6 hours (configured in `.github/renovate.json5`)
 - Creates PRs for updates - review and merge to keep images current
 
-### 8. Image Signing (Optional, Recommended for Production)
+### 9. Image Signing (Optional, Recommended for Production)
 
 **Default**: DISABLED (commented out in workflows) to allow first builds.
 
