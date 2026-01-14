@@ -8,7 +8,7 @@ Brewfiles are Homebrew's way of declaring packages in a declarative format. They
 
 ## How It Works
 
-1. **During Build**: Files in this directory are copied to `/usr/share/ublue-os/homebrew/` in the image
+1. **During Build**: Homebrew integration files from `/ctx/oci/brew/` are copied into the image, and Brewfiles are copied to `/usr/share/ublue-os/homebrew/`
 2. **After Installation**: Users install packages by running `brew bundle` commands
 3. **User Experience**: Declarative package management via Homebrew
 

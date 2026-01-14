@@ -78,3 +78,18 @@ install-vscode:
 [group('Apps')]
 install-gimp:
     ujust install-flatpak org.gimp.GIMP
+
+# Enable DankMaterialShell (DMS) integration with niri
+[group('Desktop')]
+setup-niri-dms:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Enabling DMS for niri session..."
+    systemctl --user add-wants niri.service dms
+    echo "DMS will now start automatically when you log into niri."
+    echo "Log out and log back in to niri for changes to take effect."
+
+# Shortcut for setup-niri-dms
+[group('Desktop')]
+niri-dms:
+    @ujust setup-niri-dms

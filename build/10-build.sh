@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
 set -eoux pipefail
 
@@ -14,6 +14,10 @@ set -eoux pipefail
 source /ctx/build/copr-helpers.sh
 
 echo "::group:: Copy Custom Files"
+
+cp -a /ctx/oci/common/shared/. /
+cp -a /ctx/oci/common/bluefin/. /
+cp -a /ctx/oci/brew/. /
 
 # Copy Brewfiles to standard location
 mkdir -p /usr/share/ublue-os/homebrew/
@@ -31,11 +35,48 @@ echo "::endgroup::"
 
 echo "::group:: Install Packages"
 
-# Install packages using dnf5
-# Example: dnf5 install -y tmux
+# Install niri (scrollable-tiling Wayland compositor) from COPR
+copr_install_isolated "yalter/niri" niri
 
-# Example using COPR with isolated pattern:
-# copr_install_isolated "ublue-os/staging" package-name
+# Install DankMaterialShell (DMS) stable release with companion packages
+# Note: Manually handling COPRs here because dms depends on danklinux repo
+echo "Installing DMS and dependencies..."
+dnf5 -y copr enable avengemedia/danklinux
+dnf5 -y copr enable avengemedia/dms
+
+# Install packages
+dnf5 -y install \
+    dms \
+    quickshell \
+    cliphist \
+    matugen \
+    wl-clipboard \
+    cava
+
+# Disable COPRs to ensure they don't persist
+dnf5 -y copr disable avengemedia/dms
+dnf5 -y copr disable avengemedia/danklinux
+
+echo "::endgroup::"
+
+echo "::group:: Niri Defaults"
+
+mkdir -p /etc/xdg/niri
+cp /usr/share/doc/niri/default-config.kdl /etc/xdg/niri/config.kdl
+
+echo "::endgroup::"
+
+echo "::group:: Install Supporting Utilities"
+
+# Install utilities for niri and DMS
+dnf5 install -y \
+    fuzzel \
+    alacritty \
+    swaybg \
+    swaylock \
+    mako \
+    xdg-desktop-portal-gnome \
+    xdg-desktop-portal-gtk
 
 echo "::endgroup::"
 
@@ -43,6 +84,9 @@ echo "::group:: System Configuration"
 
 # Enable/disable systemd services
 systemctl enable podman.socket
+systemctl enable brew-setup.service
+systemctl enable brew-update.timer
+systemctl enable brew-upgrade.timer
 # Example: systemctl mask unwanted-service
 
 echo "::endgroup::"

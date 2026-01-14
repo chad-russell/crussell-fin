@@ -1,4 +1,4 @@
-export image_name := env("IMAGE_NAME", "finpilot")
+export image_name := env("IMAGE_NAME", "crussell-fin")
 export default_tag := env("DEFAULT_TAG", "stable")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest@sha256:903c01d110b8533f8891f07c69c0ba2377f8d4bc7e963311082b7028c04d529d")
 
@@ -254,8 +254,10 @@ _run-vm $target_image $tag $type $config:
     run_args+=(--env "RAM_SIZE=8G")
     run_args+=(--env "DISK_SIZE=64G")
     run_args+=(--env "TPM=Y")
-    run_args+=(--env "GPU=Y")
+    run_args+=(--env "GPU=N")
+    run_args+=(--env "VM_NET_DEV=enp1s0")
     run_args+=(--device=/dev/kvm)
+    run_args+=(--device=/dev/dri)
     run_args+=(--volume "${PWD}/${image_file}":"/boot.${type}")
     run_args+=(docker.io/qemux/qemu)
 
@@ -274,6 +276,33 @@ run-vm-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-
 # Run a virtual machine from an ISO
 [group('Run Virtal Machine')]
 run-vm-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_run-vm target_image tag "iso" "iso/iso.toml")
+
+[group('Run Virtal Machine')]
+run-vm-libvirt name=image_name ram="8G" vcpus="4":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    image_file="output/qcow2/disk.qcow2"
+    if [[ ! -f "${image_file}" ]]; then
+        just build-qcow2
+    fi
+
+    if ! command -v virt-install &> /dev/null; then
+        echo "virt-install not found. Install libvirt/virt-manager."
+        exit 1
+    fi
+
+    ram_mib=$(numfmt --from=iec --to-unit=1M "{{ ram }}")
+    virt-install \
+        --name "{{ name }}" \
+        --memory "${ram_mib}" \
+        --vcpus "{{ vcpus }}" \
+        --import \
+        --disk path="${image_file}",format=qcow2,bus=virtio \
+        --network network=default,model=virtio \
+        --graphics spice \
+        --video virtio \
+        --os-variant fedora-unknown
 
 # Run a virtual machine using systemd-vmspawn
 [group('Run Virtal Machine')]
