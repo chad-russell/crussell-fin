@@ -19,6 +19,9 @@ cp -a /ctx/oci/common/shared/. /
 cp -a /ctx/oci/common/bluefin/. /
 cp -a /ctx/oci/brew/. /
 
+# Copy default user configs to skel
+cp -a /ctx/custom/skel/. /etc/skel/
+
 # Copy Brewfiles to standard location
 mkdir -p /usr/share/ublue-os/homebrew/
 cp /ctx/custom/brew/*.Brewfile /usr/share/ublue-os/homebrew/
@@ -83,7 +86,8 @@ dnf5 install -y \
     swaylock \
     mako \
     xdg-desktop-portal-gnome \
-    xdg-desktop-portal-gtk
+    xdg-desktop-portal-gtk \
+    papirus-icon-theme
 
 echo "::endgroup::"
 
