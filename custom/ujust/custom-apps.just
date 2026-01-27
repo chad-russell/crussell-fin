@@ -93,3 +93,18 @@ setup-niri-dms:
 [group('Desktop')]
 niri-dms:
     @ujust setup-niri-dms
+
+# Set system to never suspend on idle (keep system awake for SSH/services)
+[group('Desktop')]
+disable-auto-suspend:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Disabling auto-suspend on idle..."
+    gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+    gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing'
+    echo "Done. System will stay awake until you manually run: systemctl suspend"
+
+# Shortcut for disable-auto-suspend
+[group('Desktop')]
+no-auto-suspend:
+    @ujust disable-auto-suspend

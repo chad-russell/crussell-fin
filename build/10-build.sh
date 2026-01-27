@@ -33,6 +33,13 @@ cp /ctx/custom/flatpaks/*.preinstall /etc/flatpak/preinstall.d/
 
 echo "::endgroup::"
 
+echo "::group:: Custom MOTD"
+
+cp /ctx/build/motd.sh /usr/bin/ublue-motd
+chmod +x /usr/bin/ublue-motd
+
+echo "::endgroup::"
+
 echo "::group:: Install Packages"
 
 # Install niri (scrollable-tiling Wayland compositor) from COPR
@@ -77,6 +84,22 @@ dnf5 install -y \
     mako \
     xdg-desktop-portal-gnome \
     xdg-desktop-portal-gtk
+
+echo "::endgroup::"
+
+echo "::group:: Configure Zsh as Default Shell"
+
+dnf5 install -y zsh 2>/dev/null || true
+
+ZSH_PATH=$(which zsh)
+
+if ! grep -qxF "$ZSH_PATH" /etc/shells; then
+    echo "$ZSH_PATH" >> /etc/shells
+fi
+
+sed -i "s|SHELL=/bin/bash|SHELL=$ZSH_PATH|g" /etc/default/useradd
+
+cp /ctx/build/zsh/skel-zshrc /etc/skel/.zshrc
 
 echo "::endgroup::"
 

@@ -1,6 +1,6 @@
 export image_name := env("IMAGE_NAME", "crussell-fin")
 export default_tag := env("DEFAULT_TAG", "stable")
-export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
+export image_timestamp := shell("date +%Y%m%d-%H%M%S")
 
 alias build-vm := build-qcow2
 alias rebuild-vm := rebuild-qcow2
@@ -99,6 +99,39 @@ build $target_image=image_name $tag=default_tag:
         --pull=newer \
         --tag "${target_image}:${tag}" \
         .
+
+# Run bootc switch to apply the new image
+[group('Build and Switch')]
+bootc-switch target_image tag:
+    #!/usr/bin/env bash
+    set -eoux pipefail
+    sudo bootc switch --transport containers-storage "localhost/${target_image}:${tag}"
+    echo "Image queued for next boot. Reboot with: sudo systemctl reboot"
+
+# Build and switch to a new image with unique timestamp tag
+[group('Build and Switch')]
+switch $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
+    set -eoux pipefail
+    
+    # Generate unique timestamp tag
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    UNIQUE_TAG="${tag}-${TIMESTAMP}"
+    
+    echo "Building unique image: ${target_image}:${UNIQUE_TAG}"
+    
+    # Build with unique tag
+    just build {{target_image}} "${UNIQUE_TAG}"
+    
+    # Load into root podman
+    just _rootful_load_image {{target_image}} "${UNIQUE_TAG}"
+    
+    # Switch to unique tag
+    sudo bootc switch --transport containers-storage "localhost/${target_image}:${UNIQUE_TAG}" || exit 1
+    
+    echo "Image queued for next boot: ${target_image}:${UNIQUE_TAG}"
+    echo "Reboot with: sudo systemctl reboot"
+
 
 # Command: _rootful_load_image
 # Description: This script checks if the current user is root or running under sudo. If not, it attempts to resolve the image tag using podman inspect.

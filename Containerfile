@@ -44,15 +44,15 @@ COPY custom /custom
 COPY --from=ghcr.io/projectbluefin/common:latest /system_files /oci/common
 COPY --from=ghcr.io/ublue-os/brew:latest /system_files /oci/brew
 
-# Base Image - KDE Plasma included
-FROM ghcr.io/ublue-os/kinoite-main:latest
+## Base Image - KDE Plasma included
+# FROM ghcr.io/ublue-os/kinoite-main:latest
+
+# Base Image - GNOME included
+FROM ghcr.io/ublue-os/silverblue-main:latest
 
 ## Alternative base images, no desktop included (uncomment to use):
 # FROM ghcr.io/ublue-os/base-main:latest
 # FROM quay.io/centos-bootc/centos-bootc:stream10
-
-## Alternative GNOME OS base image (uncomment to use):
-# FROM ghcr.io/ublue-os/kinoite-main:latest
 
 ## Alternative GNOME OS base image (uncomment to use):
 # FROM quay.io/gnome_infrastructure/gnome-build-meta:gnomeos-nightly
